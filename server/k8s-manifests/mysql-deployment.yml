@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:5.7
+          env:
+            - name: MYSQL_DATABASE
+              value: "flask_todo_db"
+            - name: MYSQL_USER
+              value: "flaskuser"
+            - name: MYSQL_PASSWORD
+              value: "flaskpassword"
+            - name: MYSQL_ROOT_PASSWORD
+              value: "rootpassword"
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-init-script-volume
+              mountPath: /docker-entrypoint-initdb.d  # Auto-executes SQL files on startup
+      volumes:
+        - name: mysql-init-script-volume
+          configMap:
+            name: mysql-init-script
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  selector:
+    app: mysql
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+  clusterIP: None  # Headless service for internal communication

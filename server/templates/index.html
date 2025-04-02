@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask To-Do App</title>
+</head>
+<body>
+    <h2>To-Do List</h2>
+    <form action="/add" method="post">
+        <input type="text" name="task" required>
+        <button type="submit">Add</button>
+    </form>
+    <ul>
+        {% for todo in todos %}
+        <li>
+            {{ todo.task }} <a href="/delete/{{ todo.id }}">❌</a>
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
