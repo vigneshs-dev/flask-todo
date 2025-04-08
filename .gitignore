@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+*.log
+
+# Environment
+.env
+.env.*
+
+# VSCode
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Docker
+*.tar
+*.img
+flask-todo-server
+flask-todo-container
+
+# Terraform
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/.terraform.lock.hcl
+infra/crash.log
+
+# Bytecode and compiled stuff
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Unit test / coverage
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# System
+Thumbs.db
