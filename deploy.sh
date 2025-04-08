@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Return when there is an error
+set -e
+
+# Move to infra and apply terraform
+echo "Applying Terraform..."
+cd infra
+terraform apply -auto-approve
+
+# Grab the outputs
+RDS_ENDPOINT=$(terraform output -raw rds_endpoint)
+ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
+AWS_REGION=$(terraform output -raw aws_region)
+DB_USERNAME=$(terraform output -raw db_username)
+DB_NAME=$(terraform output -raw db_name)
+
+# For debugging
+echo "RDS Endpoint: $RDS_ENDPOINT"
+echo "ECR Repository URL: $ECR_REPO_URL"
+
+# Move to the server directory
+cd ../server
+
+# Update .env file
+if [ -f .env ]; then
+    echo "Updating .env file..."
+    sed -i "s|^DATABASE_URI=.*|DATABASE_URI=mysql+mysqlconnector://$DB_USERNAME:flaskpassword123!@$RDS_ENDPOINT/$DB_NAME|" .env
+else
+    echo ".env file not found. Creating it..."
+    echo "DATABASE_URI=mysql+mysqlconnector://$DB_USERNAME:flaskpassword123!@$RDS_ENDPOINT/$DB_NAME" > .env
+fi
+
+# Define image name and tag
+IMAGE_NAME="flask-todo-app"
+IMAGE_TAG="latest"
+FULL_IMAGE_NAME="$ECR_REPO_URL:$IMAGE_TAG"
+
+# Alternative login method
+echo "Logging in to ECR..."
+TOKEN=$(aws ecr get-authorization-token --region $AWS_REGION --output text --query 'authorizationData[].authorizationToken')
+echo $TOKEN | base64 -d | cut -d: -f2 | docker login --username AWS --password-stdin $ECR_REPO_URL
+
+# Build Docker image
+echo "Building Docker image..."
+docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+# Tag the image for ECR
+echo "Tagging Docker image for ECR..."
+docker tag $IMAGE_NAME:$IMAGE_TAG $FULL_IMAGE_NAME
+
+# Push the image to ECR
+echo "Pushing Docker image to ECR..."
+docker push $FULL_IMAGE_NAME
+
+# Remove any existing container with same name
+echo "Cleaning up existing containers..."
+docker rm -f flask-todo-server 2>/dev/null || true
+
+# Pull the image from ECR (to verify it works)
+echo "Pulling Docker image from ECR..."
+docker pull $FULL_IMAGE_NAME
+
+# Run Docker container with .env file
+echo "Running Docker container from ECR image..."
+docker run -d -p 5000:5000 --env-file .env --name flask-todo-server $FULL_IMAGE_NAME
+
+echo "Deployment completed successfully!"
+echo "Your Flask Todo App is running at http://localhost:5000"

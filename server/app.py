@@ -1,15 +1,22 @@
 from flask import Flask, render_template, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 import os
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
+
+# # For AWS RDS
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword123!@flask-todo-db.cpaykkoogz1f.us-east-1.rds.amazonaws.com:3306/flask_todo_db'
 
 # Use the MySQL container instead of localhost
 # For Docker Compose
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword@db/flask_todo_db'
 
 # For Kubernetes
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword@mysql-service/flask_todo_db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword@mysql-service/flask_todo_db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

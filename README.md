@@ -4,9 +4,15 @@
     - Change Database URI in app.py for Docker
 
     - docker exec -it mysql_container mysql -uflaskuser -p
+
+    For AWS RDS
+    - mysql -h flask-todo-db.cpaykkoogz1f.us-east-1.rds.amazonaws.com -P 3306 -u flaskuser -p
+
     Password: flaskpassword
     - USE flask_todo_db;
     - SHOW TABLES;
+
+    
 - Step:2 ( Kubernetes Pod)
     - Change Database URI in app.py for Kubernetes
 
