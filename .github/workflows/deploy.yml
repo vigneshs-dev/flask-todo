@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -26,22 +26,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./server
-          push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest,${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
+      # --- Terraform Infrastructure Setup First ---
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
         with:
@@ -51,34 +36,58 @@ jobs:
         working-directory: ./infra
         run: terraform init
 
-      - name: Terraform Validate
-        working-directory: ./infra
-        run: terraform validate
-
-      - name: Terraform Plan
-        working-directory: ./infra
-        run: terraform plan -out=tfplan
-
       - name: Terraform Apply
         working-directory: ./infra
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve
 
+      # --- Extract Terraform Outputs ---
+      - name: Get Terraform Outputs
+        id: tf-outputs
+        working-directory: ./infra
+        run: |
+          echo "ecr_repo_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "aws_region=$(terraform output -raw aws_region)" >> $GITHUB_OUTPUT
+          echo "alb_dns=$(terraform output -raw alb_dns_name)" >> $GITHUB_OUTPUT
+
+      # --- Docker & ECR Setup ---
+      - name: Login to Amazon ECR
+        id: login-ecr
+        run: |
+          aws ecr get-login-password --region ${{ steps.tf-outputs.outputs.aws_region }} \
+          | docker login --username AWS --password-stdin ${{ steps.tf-outputs.outputs.ecr_repo_url }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./server
+          push: true
+          tags: |
+            ${{ steps.tf-outputs.outputs.ecr_repo_url }}:latest
+            ${{ steps.tf-outputs.outputs.ecr_repo_url }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- ECS Deployment ---
       - name: Force new deployment of ECS service
         run: |
-          aws ecs update-service --cluster flask-todo-cluster --service flask-todo-service --force-new-deployment
+          aws ecs update-service \
+            --cluster flask-todo-cluster \
+            --service flask-todo-service \
+            --force-new-deployment \
+            --region ${{ steps.tf-outputs.outputs.aws_region }}
 
-      - name: Wait for service to stabilize
+      - name: Wait for ECS service to stabilize
         run: |
-          aws ecs wait services-stable --cluster flask-todo-cluster --services flask-todo-service
-          
-      - name: Get ALB DNS Name
-        id: get-alb-dns
-        run: |
-          ALB_DNS=$(aws elbv2 describe-load-balancers --names flask-todo-alb --query 'LoadBalancers[0].DNSName' --output text)
-          echo "Application URL: http://$ALB_DNS"
-          echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
-          
+          aws ecs wait services-stable \
+            --cluster flask-todo-cluster \
+            --services flask-todo-service \
+            --region ${{ steps.tf-outputs.outputs.aws_region }}
+
+      # --- Post Deployment Summary ---
       - name: Post Deployment Summary
         run: |
           echo "## Deployment Successful! :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "The application is now available at: http://${{ steps.get-alb-dns.outputs.alb_dns }}" >> $GITHUB_STEP_SUMMARY
+          echo "The application is now available at: http://${{ steps.tf-outputs.outputs.alb_dns }}" >> $GITHUB_STEP_SUMMARY
