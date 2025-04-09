@@ -6,7 +6,8 @@ set -e
 echo "Starting cleanup of ECS Fargate deployment..."
 
 # === Move into infra folder ===
-cd infra
+# cd infra
+cd terraform
 
 # === Get outputs before destruction ===
 ECR_REPO_URL=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "")

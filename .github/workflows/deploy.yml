@@ -3,18 +3,15 @@ name: Deploy Flask Todo App
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - main  # or your default branch
 
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: flask-todo-app
+permissions:
+  contents: read
+  id-token: write  # Required for AWS OIDC authentication
 
 jobs:
   deploy:
-    name: Build and Deploy
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -22,72 +19,65 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      # --- Terraform Infrastructure Setup First ---
-      - name: Set up Terraform
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}  # IAM role ARN with appropriate permissions
+          aws-region: us-east-1
+          
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.4.6
-
-      - name: Terraform Init
-        working-directory: ./infra
-        run: terraform init
-
-      - name: Terraform Apply
-        working-directory: ./infra
-        run: terraform apply -auto-approve
-
-      # --- Extract Terraform Outputs ---
-      - name: Get Terraform Outputs
-        id: tf-outputs
-        working-directory: ./infra
-        run: |
-          echo "ecr_repo_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
-          echo "aws_region=$(terraform output -raw aws_region)" >> $GITHUB_OUTPUT
-          echo "alb_dns=$(terraform output -raw alb_dns_name)" >> $GITHUB_OUTPUT
-
-      # --- Docker & ECR Setup ---
-      - name: Login to Amazon ECR
-        id: login-ecr
-        run: |
-          aws ecr get-login-password --region ${{ steps.tf-outputs.outputs.aws_region }} \
-          | docker login --username AWS --password-stdin ${{ steps.tf-outputs.outputs.ecr_repo_url }}
-
-      - name: Set up Docker Buildx
+          terraform_version: 1.5.7  # Specify your Terraform version
+          
+      - name: Setup Docker
         uses: docker/setup-buildx-action@v2
-
+          
+      - name: Initialize Terraform
+        run: |
+          cd terraform
+          terraform init
+        
+      - name: Validate Terraform
+        run: |
+          cd terraform
+          terraform validate
+          
+      - name: Plan Terraform changes
+        run: |
+          cd terraform
+          terraform plan
+          
+      - name: Apply Terraform changes
+        run: |
+          cd terraform
+          terraform apply -auto-approve
+          
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./server
-          push: true
-          tags: |
-            ${{ steps.tf-outputs.outputs.ecr_repo_url }}:latest
-            ${{ steps.tf-outputs.outputs.ecr_repo_url }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # --- ECS Deployment ---
-      - name: Force new deployment of ECS service
+        env:
+          AWS_REGION: us-east-1
         run: |
-          aws ecs update-service \
-            --cluster flask-todo-cluster \
-            --service flask-todo-service \
-            --force-new-deployment \
-            --region ${{ steps.tf-outputs.outputs.aws_region }}
-
-      - name: Wait for ECS service to stabilize
+          # Get ECR repository URL from Terraform output
+          cd terraform
+          ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
+          cd ../server
+          
+          # Login to ECR
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URL
+          
+          # Build and push Docker image
+          docker build -t flask-todo-app:latest .
+          docker tag flask-todo-app:latest $ECR_REPO_URL:latest
+          docker push $ECR_REPO_URL:latest
+          
+      - name: Deploy to ECS
+        env:
+          AWS_REGION: us-east-1
         run: |
-          aws ecs wait services-stable \
-            --cluster flask-todo-cluster \
-            --services flask-todo-service \
-            --region ${{ steps.tf-outputs.outputs.aws_region }}
-
-      # --- Post Deployment Summary ---
-      - name: Post Deployment Summary
+          # Force new deployment
+          aws ecs update-service --cluster flask-todo-cluster --service flask-todo-service --force-new-deployment --region $AWS_REGION
+          
+          # Wait for service to stabilize
+          aws ecs wait services-stable --cluster flask-todo-cluster --services flask-todo-service --region $AWS_REGION
+          
+      - name: Print application URL
         run: |
-          echo "## Deployment Successful! :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "The application is now available at: http://${{ steps.tf-outputs.outputs.alb_dns }}" >> $GITHUB_STEP_SUMMARY
+          cd terraform
+          echo "Application is available at: http://$(terraform output -raw alb_dns_name)"

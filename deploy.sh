@@ -82,7 +82,11 @@ set -e
 
 # === Apply Terraform Infrastructure ===
 echo "Applying Terraform..."
-cd infra
+
+
+cd terraform
+
+# cd infra
 terraform apply -auto-approve
 
 # Grab the outputs

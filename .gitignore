@@ -30,6 +30,13 @@ infra/terraform.tfstate.backup
 infra/.terraform.lock.hcl
 infra/crash.log
 
+# Terraform folder
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.terraform.lock.hcl
+terraform/crash.log
+
 # Bytecode and compiled stuff
 *.egg-info/
 *.egg
