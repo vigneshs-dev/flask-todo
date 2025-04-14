@@ -55,16 +55,13 @@ jobs:
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          # Get ECR repository URL from Terraform output
+          # Get ECR repository URL from Terraform output without the -raw flag
           cd terraform
-          ECR_REPO_URL=$(terraform output -raw ecr_repository_url)
+          ECR_REPO_URL=$(terraform output ecr_repository_url | tr -d '"')
           cd ../server
           
-          # Login to ECR
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URL || \
-          (echo "Standard login failed, trying alternative method..." && \
-           TOKEN=$(aws ecr get-authorization-token --region $AWS_REGION --output text --query 'authorizationData[].authorizationToken') && \
-           echo $TOKEN | base64 -d | cut -d: -f2 | docker login --username AWS --password-stdin $ECR_REPO_URL)
+          # Login to ECR with corrected syntax
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URL
           
           # Build and push Docker image
           docker build -t flask-todo-app:latest .
@@ -84,4 +81,5 @@ jobs:
       - name: Print application URL
         run: |
           cd terraform
-          echo "Application is available at: http://$(terraform output -raw alb_dns_name)"
+          ALB_DNS_NAME=$(terraform output alb_dns_name | tr -d '"')
+          echo "Application is available at: http://$ALB_DNS_NAME"
