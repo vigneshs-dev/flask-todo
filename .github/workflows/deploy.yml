@@ -16,11 +16,10 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
           aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-          aws configure set region $AWS_REGION
+          aws configure set region us-east-1
           aws configure set output json
           
       - name: Setup Terraform
@@ -48,25 +47,21 @@ jobs:
           
       - name: Get ECR Repository
         id: get-ecr
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           # Get AWS account ID
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> $GITHUB_ENV
           
-          # Construct ECR repository URL directly
-          ECR_REPO_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/flask-todo-app"
+          # Construct ECR repository URL with hardcoded region
+          ECR_REPO_URL="${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/flask-todo-app"
           echo "ECR_REPO_URL=$ECR_REPO_URL" >> $GITHUB_ENV
           
       - name: Build and push Docker image
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           cd server
           
-          # Login to ECR
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URL
+          # Login to ECR with hardcoded region
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO_URL
           
           # Build and push Docker image
           docker build -t flask-todo-app:latest .
@@ -74,14 +69,12 @@ jobs:
           docker push $ECR_REPO_URL:latest
           
       - name: Deploy to ECS
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          # Force new deployment
-          aws ecs update-service --cluster flask-todo-cluster --service flask-todo-service --force-new-deployment --region $AWS_REGION
+          # Force new deployment with hardcoded region
+          aws ecs update-service --cluster flask-todo-cluster --service flask-todo-service --force-new-deployment --region us-east-1
           
           # Wait for service to stabilize
-          aws ecs wait services-stable --cluster flask-todo-cluster --services flask-todo-service --region $AWS_REGION
+          aws ecs wait services-stable --cluster flask-todo-cluster --services flask-todo-service --region us-east-1
           
       - name: Get ALB DNS Name
         id: get-alb
