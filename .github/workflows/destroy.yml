@@ -1,28 +1,80 @@
-# name: Destroy Infrastructure
+name: Destroy Infrastructure
 
-# on:
-#   workflow_dispatch:  # allows manual trigger from GitHub UI
+on:
+  workflow_dispatch:  # This allows manual trigger from GitHub UI only
 
-# jobs:
-#   destroy:
-#     runs-on: ubuntu-latest
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
 
-#     env:
-#       AWS_REGION: us-east-1
-#       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set region us-east-1
+          aws configure set output json
 
-#       - name: Setup Terraform
-#         uses: hashicorp/setup-terraform@v2
-#         with:
-#           terraform_version: 1.5.0  # use your version
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7  # Same as in deploy.yml for consistency
 
-#       - name: Terraform Init
-#         run: terraform init
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
 
-#       - name: Terraform Destroy
-#         run: terraform destroy -auto-approve
+      - name: Get Infrastructure Details
+        id: get-details
+        run: |
+          cd terraform
+          # Get outputs for cleanup
+          ECR_REPO_URL=$(terraform output ecr_repository_url | tr -d '"' || echo "")
+          echo "ECR_REPO_URL=$ECR_REPO_URL" >> $GITHUB_ENV
+          
+          # Set constants
+          echo "CLUSTER_NAME=flask-todo-cluster" >> $GITHUB_ENV
+          echo "SERVICE_NAME=flask-todo-service" >> $GITHUB_ENV
+          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+
+      - name: Scale down ECS service
+        run: |
+          echo "Scaling down ECS service..."
+          aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --desired-count 0 --region $AWS_REGION || echo "Failed to scale down ECS service, continuing anyway"
+          
+          echo "Waiting for tasks to stop (this may take a minute)..."
+          sleep 30
+
+      - name: Clean up ECR repository images
+        run: |
+          if [ ! -z "$ECR_REPO_URL" ]; then
+            echo "Cleaning up ECR repository images..."
+            REPO_NAME="flask-todo-app"
+            
+            # Delete all images in the repository
+            aws ecr list-images --repository-name $REPO_NAME --region $AWS_REGION --query 'imageIds[*]' --output json | \
+            aws ecr batch-delete-image --repository-name $REPO_NAME --region $AWS_REGION --image-ids file:///dev/stdin || echo "Failed to delete ECR images, continuing anyway"
+          fi
+
+      - name: Terraform Destroy
+        run: |
+          cd terraform
+          terraform destroy -auto-approve
+          
+      - name: Verify destruction
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ ECS Fargate, RDS, and related infra destroyed successfully."
+          else
+            echo "❌ Terraform destroy failed."
+            exit 1
+          fi
+          
+          echo "Cleanup completed successfully!"
