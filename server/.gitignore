@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+
+# Flask instance folder
+instance/
+
+# Pytest cache
+.pytest_cache/
+
+# VS Code settings
+.vscode/
+
+# macOS files
+.DS_Store
+
+# Database files
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+
+# Compiled HTML docs (if using Sphinx)
+_build/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# Logs
+*.log
+
+# Migrations (optional – only if you're regenerating them)
+migrations/

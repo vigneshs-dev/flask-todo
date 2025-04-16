@@ -51,6 +51,11 @@ def get_secret():
 # Get database credentials from Secrets Manager
 db_credentials = get_secret()
 
+print("DB credentials loaded:")
+for k, v in db_credentials.items():
+    print(f"{k}: {v}")
+
+
 if db_credentials:
     # Build the connection string from the secret values
     db_uri = f"mysql+mysqlconnector://{db_credentials['username']}:{db_credentials['password']}@{db_credentials['host']}:{db_credentials['port']}/{db_credentials['dbname']}"

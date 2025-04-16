@@ -47,18 +47,18 @@ module "database" {
   secret_arn          = module.secrets.secret_arn
 }
 
-# Then update the secret with database connection info
 resource "aws_secretsmanager_secret_version" "db_connection_update" {
   secret_id     = module.secrets.secret_arn
+
   secret_string = jsonencode({
     username = var.db_username
     password = module.secrets.db_password
-    engine   = "mysql" # or whatever engine you're using
-    host     = module.database.rds_endpoint
+    engine   = "mysql"
+    host     = split(":", module.database.rds_endpoint)[0] # <-- removes port
     port     = module.database.rds_port
     dbname   = var.db_name
   })
-  
+
   depends_on = [module.database]
 }
 
