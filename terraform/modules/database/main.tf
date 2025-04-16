@@ -28,7 +28,31 @@ resource "aws_db_instance" "todo_rds" {
   backup_retention_period = 7
   multi_az               = false # Set to true for production environments
   
+  # Enable deletion protection for production
+  deletion_protection = var.environment == "prod" ? true : false
+  
   tags = {
-    Name = "Flask Todo Database"
+    Name        = "Flask Todo Database"
+    Environment = var.environment
   }
+}
+
+# Add permissions for the ECS task to access the secret
+resource "aws_iam_policy" "secrets_access" {
+  name        = "${var.environment}-db-secrets-access-policy"
+  description = "Policy to allow access to DB credentials in Secrets Manager"
+  
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ],
+        Effect   = "Allow",
+        Resource = var.secret_arn
+      }
+    ]
+  })
 }

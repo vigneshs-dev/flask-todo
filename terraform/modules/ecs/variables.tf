@@ -38,6 +38,14 @@ variable "db_password" {
   type        = string
 }
 
+# variable "db_password" {
+#   description = "Database password"
+#   type        = string
+#   default     = ""
+#   sensitive   = true
+# }
+
+
 variable "db_name" {
   description = "Name of the database"
   type        = string
@@ -71,4 +79,24 @@ variable "service_desired_count" {
   description = "Desired count of ECS tasks"
   type        = number
   default     = 1
+}
+
+
+
+
+# Add these new variables to your existing variables.tf
+variable "secret_name" {
+  description = "Name of the secret in AWS Secrets Manager"
+  type        = string
+}
+
+variable "secret_arn" {
+  description = "ARN of the secret in AWS Secrets Manager"
+  type        = string
+}
+
+
+variable "secrets_access_policy_arn" {
+  description = "ARN of the policy to access database secrets"
+  type        = string
 }

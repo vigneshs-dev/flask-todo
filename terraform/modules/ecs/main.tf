@@ -12,76 +12,6 @@ resource "aws_ecs_cluster" "app_cluster" {
   }
 }
 
-# ECS Task Execution Role
-resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "flask-todo-ecs-execution-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# Attach policies to ECS Task Execution Role
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-# ECS Task Role
-resource "aws_iam_role" "ecs_task_role" {
-  name = "flask-todo-ecs-task-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-# Create a custom policy for CloudWatch Logs permissions
-resource "aws_iam_policy" "ecs_cloudwatch_logs_policy" {
-  name        = "ECSCloudWatchLogsPolicy"
-  description = "Policy that allows ECS tasks to create and manage CloudWatch log groups"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
-        ]
-        Effect   = "Allow"
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# Attach the CloudWatch Logs policy to the ECS task execution role
-resource "aws_iam_role_policy_attachment" "ecs_cloudwatch_logs_policy_attachment" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = aws_iam_policy.ecs_cloudwatch_logs_policy.arn
-}
-
 # Application Load Balancer
 resource "aws_lb" "app_lb" {
   name               = "flask-todo-alb"
@@ -157,10 +87,41 @@ resource "aws_ecs_task_definition" "app_task" {
         }
       ]
       
+      # Remove the hardcoded DATABASE_URI environment variable
+      # Instead, provide the SECRET_NAME environment variable
       environment = [
         {
-          name  = "DATABASE_URI"
-          value = "mysql+mysqlconnector://${var.db_username}:${var.db_password}@${var.db_endpoint}/${var.db_name}"
+          name  = "AWS_REGION"
+          value = var.aws_region
+        },
+        {
+          name  = "SECRET_NAME"
+          value = var.secret_name
+        }
+      ]
+      
+      # You can also use the secrets parameter to directly inject values from Secrets Manager
+      # This is an alternative approach that doesn't require boto3 in your application
+      secrets = [
+        {
+          name      = "DB_HOST",
+          valueFrom = "${var.secret_arn}:host::"
+        },
+        {
+          name      = "DB_PORT", 
+          valueFrom = "${var.secret_arn}:port::"
+        },
+        {
+          name      = "DB_NAME",
+          valueFrom = "${var.secret_arn}:dbname::"
+        },
+        {
+          name      = "DB_USER",
+          valueFrom = "${var.secret_arn}:username::"
+        },
+        {
+          name      = "DB_PASSWORD",
+          valueFrom = "${var.secret_arn}:password::"
         }
       ]
       

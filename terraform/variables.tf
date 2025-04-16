@@ -97,3 +97,9 @@ variable "service_desired_count" {
   type        = number
   default     = 1
 }
+
+variable "environment" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
+  default     = "dev"
+}

@@ -96,11 +96,13 @@ AWS_REGION=$(terraform output -raw aws_region)
 DB_USERNAME=$(terraform output -raw db_username)
 DB_NAME=$(terraform output -raw db_name)
 ALB_DNS_NAME=$(terraform output -raw alb_dns_name)
+SECRET_NAME=$(terraform output -raw secret_name)
 
 # For debugging
 echo "RDS Endpoint: $RDS_ENDPOINT"
 echo "ECR Repository URL: $ECR_REPO_URL"
 echo "ALB DNS Name: $ALB_DNS_NAME"
+echo "Secret Name: $SECRET_NAME"
 
 # Move to the server directory
 cd ../server
