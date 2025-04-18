@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'terraform/**'
+      - 'server/**'
+      - 'server/Dockerfile'
+      - '.github/workflows/deploy.yml' # Optional: To trigger when this workflow is updated
 
 jobs:
   infra:
@@ -47,12 +52,12 @@ jobs:
     name: Deploy App Container
     runs-on: ubuntu-latest
     needs: infra
-    if: github.event_name == 'push'
-    # Only run this job if files under 'server/' or the Dockerfile changed
-    paths:
-      - 'server/**'
-      - 'server/Dockerfile'
-
+    if: github.event_name == 'push' && (
+          contains(join(github.event.commits.*.modified, ','), 'server/') || 
+          contains(join(github.event.commits.*.added, ','), 'server/') || 
+          contains(join(github.event.commits.*.modified, ','), 'server/Dockerfile') || 
+          contains(join(github.event.commits.*.added, ','), 'server/Dockerfile')
+        )
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
