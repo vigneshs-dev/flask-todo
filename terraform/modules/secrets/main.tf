@@ -8,7 +8,7 @@ resource "random_password" "db_password" {
 
 # AWS Secrets Manager Secret
 resource "aws_secretsmanager_secret" "db_secret" {
-  name        = "${var.environment}-${var.db_name}-credentials"
+  name        = "${var.environment}-${var.db_name}-credentials-v2"
   description = "Database credentials for ${var.db_name}"
   
   tags = {
