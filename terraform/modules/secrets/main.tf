@@ -10,6 +10,9 @@ resource "random_password" "db_password" {
 resource "aws_secretsmanager_secret" "db_secret" {
   name        = "${var.environment}-${var.db_name}-credentials-v2"
   description = "Database credentials for ${var.db_name}"
+
+  recovery_window_in_days = 0  # << This permanently deletes it right away
+  force_overwrite_replica_secret = true  # (if using replication)
   
   tags = {
     Environment = var.environment
