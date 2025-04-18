@@ -32,3 +32,8 @@ output "alb_dns_name" {
   description = "The DNS name of the Application Load Balancer"
   value       = module.ecs.alb_dns_name
 }
+
+output "secret_name" {
+  description = "Name of the database secrets manager secret"
+  value       = module.secrets.secret_name
+}

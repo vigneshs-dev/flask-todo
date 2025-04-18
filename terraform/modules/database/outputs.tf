@@ -13,13 +13,15 @@ output "db_username" {
   value       = aws_db_instance.todo_rds.username
 }
 
-output "db_password" {
-  description = "Database password"
-  value       = aws_db_instance.todo_rds.password
-  sensitive   = true
-}
+# Remove the db_password output for security
+# Instead, use the secret ARN to access the password
 
 output "db_name" {
   description = "Database name"
   value       = aws_db_instance.todo_rds.db_name
+}
+
+output "secrets_access_policy_arn" {
+  description = "ARN of the policy to access database secrets"
+  value       = aws_iam_policy.secrets_access.arn
 }

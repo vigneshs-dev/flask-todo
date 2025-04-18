@@ -1,6 +1,13 @@
-flask
-flask_sqlalchemy
-mysql-connector-python 
-flask-mysql 
-python-dotenv
+# flask
+# flask_sqlalchemy
+# mysql-connector-python 
+# # flask-mysql 
+# python-dotenv
+# mysqlclient
+# boto3
 
+Flask
+Flask-SQLAlchemy
+mysql-connector-python
+python-dotenv
+boto3

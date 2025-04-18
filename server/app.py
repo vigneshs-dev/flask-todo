@@ -1,23 +1,68 @@
 from flask import Flask, render_template, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 import os
+import json
+import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
+def get_secret():
+    """
+    Retrieve database credentials from AWS Secrets Manager
+    """
+    secret_name = os.getenv("SECRET_NAME")
+    region_name = os.getenv("AWS_REGION", "us-east-1")
+    
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+    
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except ClientError as e:
+        # Handle potential errors
+        app.logger.error(f"Error retrieving secret: {e}")
+        # Fall back to environment variables if secret retrieval fails
+        return {
+            "username": os.getenv("DB_USER", "flaskuser"),
+            "password": os.getenv("DB_PASSWORD", ""),
+            "host": os.getenv("DB_HOST", ""),
+            "port": os.getenv("DB_PORT", "3306"),
+            "dbname": os.getenv("DB_NAME", "flask_todo_db")
+        }
+    else:
+        # Decrypted secret
+        if 'SecretString' in get_secret_value_response:
+            secret = get_secret_value_response['SecretString']
+            return json.loads(secret)
+        else:
+            app.logger.error("Unable to retrieve secret text")
+            return None
 
-# # For AWS RDS
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword123!@flask-todo-db.cpaykkoogz1f.us-east-1.rds.amazonaws.com:3306/flask_todo_db'
+# Get database credentials from Secrets Manager
+db_credentials = get_secret()
 
-# Use the MySQL container instead of localhost
-# For Docker Compose
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword@db/flask_todo_db'
+print("DB credentials loaded:")
+for k, v in db_credentials.items():
+    print(f"{k}: {v}")
 
-# For Kubernetes
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://flaskuser:flaskpassword@mysql-service/flask_todo_db'
+
+if db_credentials:
+    # Build the connection string from the secret values
+    db_uri = f"mysql+mysqlconnector://{db_credentials['username']}:{db_credentials['password']}@{db_credentials['host']}:{db_credentials['port']}/{db_credentials['dbname']}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+else:
+    # Fallback to environment variable if secret retrieval fails
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

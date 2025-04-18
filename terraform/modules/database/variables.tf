@@ -35,5 +35,17 @@ variable "db_username" {
 variable "db_password" {
   description = "Password for the database"
   type        = string
-  default     = "flaskpassword123!" # Should use a more secure method in production
+  sensitive   = true
+}
+
+variable "environment" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "secret_arn" {
+  description = "ARN of the secret in Secrets Manager"
+  type        = string
+  default     = ""
 }
