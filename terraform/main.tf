@@ -62,7 +62,7 @@ resource "aws_secretsmanager_secret_version" "db_connection_update" {
   depends_on = [module.database]
 }
 
-# Add role attachment for ECS task to access secret
+# Add role attachment for ECS task to access secrets
 resource "aws_iam_role_policy_attachment" "ecs_task_secrets_access" {
   role       = module.ecs.task_execution_role_name  # Assuming you have this output from your ECS module
   policy_arn = module.database.secrets_access_policy_arn
